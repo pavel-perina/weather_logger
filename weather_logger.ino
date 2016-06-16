@@ -8,12 +8,12 @@
 #include <avr/sleep.h>
 #include <Wire.h>
 #include <SPI.h>
-#include <SdFat.h> // link
+#include <SdFat.h> // https://github.com/greiman/SdFat
 
 const uint8_t SD_CHIP_SELECT  = 10;
 const uint8_t RTC_INT_PIN     = 3;  // must be 2 or 3
 // TODO: set other pin, this one powers up SD card (and lightbulb :-) )
-const uint8_t LED_AWAKE_PIN   = 4;  // pin13 is SPI CLK
+const uint8_t LED_AWAKE_PIN   = 5;  // pin13 is SPI CLK
 const uint8_t SD_AWAKE_PIN    = 4;  
 const uint8_t VBAT_PIN        = A3; // analog pin for vBat 
 
@@ -214,6 +214,35 @@ void rtcAlarmInMinutes(uint8_t inMinutes)
   Wire.endTransmission();
 }
 
+void rtcAlarmInSeconds(uint8_t inSeconds)
+{
+  Wire.begin(DS3231_I2C_ADDRESS);
+  Wire.beginTransmission(DS3231_I2C_ADDRESS);
+  Wire.write((byte) 0);   // set address to 0 (seconds)
+  Wire.endTransmission();
+
+  Wire.requestFrom(DS3231_I2C_ADDRESS, 1);
+  uint8_t secs = bcd2bin(Wire.read());  // seconds
+  secs += inSeconds;
+  if (secs > 59) 
+    secs -= 60; 
+  
+  Wire.beginTransmission(DS3231_I2C_ADDRESS);
+  // A1M4=1 A1M3=1 A1M2=1 A1M2=0 -> alarm when seconds match
+  Wire.write((byte) 7);
+  Wire.write(bin2bcd(secs));  // 07 A1M1, seconds
+  Wire.write(0b10000000);     // 08 A1M2, minutes
+  Wire.write(0b10000000);     // 09 A1M3, hours
+  Wire.write(0b10000000);     // 0A A1M4, day
+  Wire.write(0b00000000);     // 0B A2M2, minutes
+  Wire.write(0b00000000);     // 0C A2M3, hours
+  Wire.write(0b00000000);     // 0D A2M4, day
+  Wire.write(0b00000101);     // 0E INTCN-int pin mode, A1IE (alarm1 int enable)
+  Wire.write(0b00000000);     // 0F Reset current alarm(s)
+  Wire.endTransmission();
+}
+
+
 /// \brief Disable RTC alarms and clear interrupt (RTC_INT_PIN pin to HIGH)
 static void rtcDisableAlarm()
 {
@@ -270,6 +299,9 @@ void sleepNow()
 ///////////////////////////////////////////////////////////////////////
 // SD Card code
 
+SdFat  sd;
+SdFile file;
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 // VCC MONITOR
@@ -297,7 +329,7 @@ long batVoltage()
   return 0;
 }
 
-class LedPin
+class OutPin
 {
 private:
 
@@ -305,7 +337,7 @@ private:
 
 public:
 
-  LedPin()
+  OutPin()
     : pin(-1)
   {
   }
@@ -335,17 +367,20 @@ public:
 // Main program
 
 
-LedPin ledAwake;
+OutPin ledAwake;
+OutPin sdAwake;
 
 void setup()
 {
   ledAwake.init(LED_AWAKE_PIN);
+  sdAwake.init(SD_AWAKE_PIN);
   ledAwake.on();
-     
+  sdAwake.off();
+
   Serial.begin(9600);
   while (!Serial)
     ;
-  Serial.println("\n\nBoot up ...");       
+  Serial.println("\n\nBoot up ...");
 
   Wire.begin(); 
   rtcDisableAlarm();
@@ -360,7 +395,7 @@ void setup()
   
   rtcIntSetup();
   delay(500);
-  rtcAlarmInMinutes(2); // at least two minutes, alarm can happen within second here
+  rtcAlarmInSeconds(15); // at least two minutes, alarm can happen within second here
   /// \todo fix alarm code, add safeGuardSeconds parameter
   ledAwake.off();
   sleepNow();  
@@ -371,24 +406,72 @@ void loop()
 {
   sleep_disable();
   ledAwake.on();
+  Serial.println("Awake ...");
+  Serial.flush();
+  delay(50);
+  sdAwake.on();
+  Serial.println("SD Card powered up ...");
+  Serial.flush();
+  delay(50);
+  
+  rtcAlarmInSeconds(15); // preferably clear alarm now  
 
   // Read sensors
   float htu_temp, htu_hum;
   readHTU(&htu_temp, &htu_hum);
 
-  Serial.print("\"");
-  Serial.print(rtcDateTimeStr());
-  Serial.print("\",");
-  Serial.print(vccVoltage());
-  Serial.print(",");
-  Serial.print(batVoltage());
-  Serial.print(",");
-  Serial.print(htu_temp);
-  Serial.print(",");
-  Serial.print(htu_hum);
-  Serial.println("");
+  String line;
+  char *pDateTimeStr = rtcDateTimeStr(); 
+  line.reserve(80);
+  line  = '"';
+  line += pDateTimeStr;
+  line += "\",";
+  line += vccVoltage();
+  line += ',';
+  line += batVoltage();
+  line += ',';
+  line += htu_temp;
+  line += ',';
+  line += htu_hum;
+  line += '\n';
+  Serial.print(line);
+  Serial.flush();
+  delay(150);
+  uint32_t timer = millis();
+  if (sd.cardBegin(SD_CHIP_SELECT, SPI_HALF_SPEED)) {
+    timer = millis() - timer;
+    
+    Serial.print("INFO: sd.cardBegin() took ");
+    Serial.print(timer);
+    Serial.println("ms");
+    Serial.flush();
+    delay(50);
+    
+    char filename[] = "YYYY-MM.CSV";
+    for (int i = 0; i < 7; i++)
+      filename[i] = pDateTimeStr[i];
+      Serial.println(filename);
+      Serial.flush();
+      delay(50);
+    
+    if (file.open(filename, O_WRITE | O_APPEND | O_CREAT)) {
+      Serial.println("File opened");
+      file.print(line);
+      Serial.println("Line printed");
+      file.close();    
+      Serial.println("File written");
+    } else {
+       Serial.println("ERROR: file.open() failed");
+       // error LED
+    }    
+  } else {
+    Serial.println("ERROR: sd.cardBegin() failed");
+    // TODO: error LED
+  }
+  // Write to card
+  delay(100);
   
-  rtcAlarmInMinutes(1);
+  sdAwake.off();
   ledAwake.off();
   sleepNow();
 

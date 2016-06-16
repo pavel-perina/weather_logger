@@ -8,7 +8,7 @@ Just for fun.
 ## Goals:
 
 - [ ] Runs 2 months or more on "reasonable" batteries (4x3000mAH at worst)
-- [ ] Monitors temperature, humidity, pressure and voltage battery
+- [ ] Monitors temperature, humidity, pressure and battery voltage
 - [ ] Logs data to SD card
 - [ ] Survives rain, snow and reasonably low temperatures (let's say -15C)
 
