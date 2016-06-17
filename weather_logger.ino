@@ -186,6 +186,8 @@ char * rtcDateTimeStr()
 
 
 /// \brief  Set DS32XX alarm in X minutes from now
+#define DEBUG_MODE 1
+
 void rtcAlarmInMinutes(uint8_t inMinutes)
 {
   Wire.begin(DS3231_I2C_ADDRESS);
@@ -241,7 +243,6 @@ void rtcAlarmInSeconds(uint8_t inSeconds)
   Wire.write(0b00000000);     // 0F Reset current alarm(s)
   Wire.endTransmission();
 }
-
 
 /// \brief Disable RTC alarms and clear interrupt (RTC_INT_PIN pin to HIGH)
 static void rtcDisableAlarm()
@@ -395,7 +396,7 @@ void setup()
   
   rtcIntSetup();
   delay(500);
-  rtcAlarmInSeconds(15); // at least two minutes, alarm can happen within second here
+  rtcAlarmInSeconds(8); // at least two minutes, alarm can happen within second here
   /// \todo fix alarm code, add safeGuardSeconds parameter
   ledAwake.off();
   sleepNow();  
@@ -448,12 +449,13 @@ void loop()
     delay(50);
     
     char filename[] = "YYYY-MM.CSV";
-    for (int i = 0; i < 7; i++)
+    for (int i = 0; i < 7; i++) {
       filename[i] = pDateTimeStr[i];
-      Serial.println(filename);
-      Serial.flush();
-      delay(50);
-    
+    }
+    Serial.println(filename);
+    Serial.flush();
+    delay(50);
+#if 0    
     if (file.open(filename, O_WRITE | O_APPEND | O_CREAT)) {
       Serial.println("File opened");
       file.print(line);
@@ -464,6 +466,18 @@ void loop()
        Serial.println("ERROR: file.open() failed");
        // error LED
     }    
+#else 
+    ofstream sdout(filename, ios::out | ios::app); 
+    if (sdout.good()) {
+      Serial.println("openened");
+      
+      //sdout.seekp(0, ios::end); 
+      sdout << line;
+      sdout.close();
+    } else {
+      Serial.println("ERROR: sdout.open() failed");
+    }
+#endif
   } else {
     Serial.println("ERROR: sd.cardBegin() failed");
     // TODO: error LED
