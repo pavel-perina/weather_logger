@@ -407,13 +407,13 @@ void loop()
 {
   sleep_disable();
   ledAwake.on();
-  Serial.println("Awake ...");
+  /*Serial.println("Awake ...");
   Serial.flush();
-  delay(50);
+  delay(50);*/
   sdAwake.on();
-  Serial.println("SD Card powered up ...");
+  /*Serial.println("SD Card powered up ...");
   Serial.flush();
-  delay(50);
+  delay(50);*/
   
   rtcAlarmInSeconds(15); // preferably clear alarm now  
 
@@ -436,32 +436,30 @@ void loop()
   line += htu_hum;
   line += '\n';
   Serial.print(line);
-  Serial.flush();
+  /*Serial.flush();
   delay(150);
   uint32_t timer = millis();
-  if (sd.cardBegin(SD_CHIP_SELECT, SPI_HALF_SPEED)) {
-    timer = millis() - timer;
-    
+  */
+  if (sd.begin(SD_CHIP_SELECT, SPI_HALF_SPEED)) {
+    /*timer = millis() - timer;
     Serial.print("INFO: sd.cardBegin() took ");
     Serial.print(timer);
     Serial.println("ms");
     Serial.flush();
     delay(50);
-    
+    */
     char filename[] = "YYYY-MM.CSV";
     for (int i = 0; i < 7; i++) {
       filename[i] = pDateTimeStr[i];
     }
-    Serial.println(filename);
-    Serial.flush();
-    delay(50);
-#if 0    
+    
+#if 1    
     if (file.open(filename, O_WRITE | O_APPEND | O_CREAT)) {
-      Serial.println("File opened");
+      //Serial.println("File opened");
       file.print(line);
-      Serial.println("Line printed");
+      //Serial.println("Line printed");
       file.close();    
-      Serial.println("File written");
+      //Serial.println("File written");
     } else {
        Serial.println("ERROR: file.open() failed");
        // error LED
@@ -469,7 +467,7 @@ void loop()
 #else 
     ofstream sdout(filename, ios::out | ios::app); 
     if (sdout.good()) {
-      Serial.println("openened");
+      //Serial.println("openened");
       
       //sdout.seekp(0, ios::end); 
       sdout << line;
