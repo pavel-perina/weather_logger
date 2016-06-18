@@ -21,10 +21,10 @@ Just for fun.
 - [x] SD card power shut-down and re-ininitalization
 - [x] HTU21D temperature reading
 - [ ] BMP180 pressure reading
-- [ ] Battery voltage monitor
+- [x] Battery voltage monitor
 - [x] VCC monitor
 - [ ] No data corruption at low power (try to sleep forever)
-- [ ] No data corruption at low temperature
+- [x] No data corruption at low temperature
 
 ## Conclusions:
 
@@ -84,4 +84,4 @@ TODO: shutdown circuit scheme & wiring
 
 ## Screenshot(s)   
 
-![Screenshot 1](2016-06-15_193643.png)
+![Early serial output test](2016-06-15_193643.png)
