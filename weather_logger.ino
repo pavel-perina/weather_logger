@@ -323,12 +323,14 @@ long vccVoltage()
   return result;
 }
 
-
-/// \todo Implement battery voltage
-long batVoltage()
+int batVoltage(long vcc)
 {
-  return 0;
+  int r = analogRead(A0);
+  Serial.print("A0: ");
+  Serial.println(r);
+  return (int)((vcc*2/1023.0)*r);
 }
+
 
 class OutPin
 {
@@ -423,13 +425,15 @@ void loop()
 
   String line;
   char *pDateTimeStr = rtcDateTimeStr(); 
+  long vCC  = vccVoltage();
+  int vBat = batVoltage(vCC); // vcc as ref
   line.reserve(80);
   line  = '"';
   line += pDateTimeStr;
   line += "\",";
-  line += vccVoltage();
+  line += vCC;
   line += ',';
-  line += batVoltage();
+  line += vBat;
   line += ',';
   line += htu_temp;
   line += ',';
