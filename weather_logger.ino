@@ -326,8 +326,6 @@ long vccVoltage()
 int batVoltage(long vcc)
 {
   int r = analogRead(A0);
-  Serial.print("A0: ");
-  Serial.println(r);
   return (int)((vcc*2/1023.0)*r);
 }
 
@@ -383,18 +381,18 @@ void setup()
   Serial.begin(9600);
   while (!Serial)
     ;
-  Serial.println("\n\nBoot up ...");
+  Serial.println(F("\n\nBoot up ..."));
 
   Wire.begin(); 
   rtcDisableAlarm();
-  Serial.print("RTC time is: ");
+  Serial.print(F("RTC time is: "));
   Serial.println(rtcDateTimeStr());
     
   //ReadSensors();
   //Serial.println(logLine);
   
     
-  Serial.println("Setting up alarm clock and going to sleep. See you in minute or two ...");
+  Serial.println(F("Setting up alarm clock and going to sleep. See you in minute or two ..."));
   
   rtcIntSetup();
   delay(500);
@@ -435,9 +433,11 @@ void loop()
   line += ',';
   line += vBat;
   line += ',';
-  line += htu_temp;
+  if (htu_temp > -90)
+    line += htu_temp;
   line += ',';
-  line += htu_hum;
+  if (htu_hum > -90)
+    line += htu_hum;
   line += '\n';
   Serial.print(line);
   /*Serial.flush();
@@ -459,13 +459,10 @@ void loop()
     
 #if 1    
     if (file.open(filename, O_WRITE | O_APPEND | O_CREAT)) {
-      //Serial.println("File opened");
       file.print(line);
-      //Serial.println("Line printed");
       file.close();    
-      //Serial.println("File written");
     } else {
-       Serial.println("ERROR: file.open() failed");
+       Serial.println(F("ERROR: file.open() failed"));
        // error LED
     }    
 #else 
@@ -477,17 +474,24 @@ void loop()
       sdout << line;
       sdout.close();
     } else {
-      Serial.println("ERROR: sdout.open() failed");
+      Serial.println(F("ERROR: sdout.open() failed"));
     }
 #endif
   } else {
-    Serial.println("ERROR: sd.cardBegin() failed");
+    Serial.println(F("ERROR: sd.cardBegin() failed"));
     // TODO: error LED
   }
   // Write to card
   delay(100);
   
   sdAwake.off();
+  // this is nasty but since we killed power to SD card, lets disconnect communication pins as well to stop it draw power from digital pins
+  delay(5);
+  pinMode(10, INPUT);
+  pinMode(11, INPUT);
+  pinMode(12, INPUT);
+  pinMode(13, INPUT);
+  
   ledAwake.off();
   sleepNow();
 
