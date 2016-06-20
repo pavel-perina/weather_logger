@@ -5,10 +5,15 @@
 /// \date	June 2016
 ///////////////////////////////////////////////////////////////////////
 
+#define USE_BMP180 1
+
 #include <avr/sleep.h>
 #include <Wire.h>
 #include <SPI.h>
-#include <SdFat.h> // https://github.com/greiman/SdFat
+#include <SdFat.h>      // https://github.com/greiman/SdFat
+#if USE_BMP180
+#include <SFE_BMP180.h> // https://learn.sparkfun.com/tutorials/bmp180-barometric-pressure-sensor-hookup-/installing-the-arduino-library
+#endif
 
 const uint8_t SD_CHIP_SELECT  = 10;
 const uint8_t RTC_INT_PIN     = 3;  // must be 2 or 3
@@ -124,24 +129,35 @@ void readHTU(float *temp, float *hum)
 
 ///////////////////////////////////////////////////////////////////////
 // BMP180 temperature / pressure sensor
-// from sparkfun library
-#define BMP180_ADDR 0x77 // 7-bit address
 
-#define BMP180_REG_CONTROL 0xF4
-#define BMP180_REG_RESULT 0xF6
+#if USE_BMP180
 
-#define BMP180_COMMAND_TEMPERATURE 0x2E
-#define BMP180_COMMAND_PRESSURE0 0x34
-#define BMP180_COMMAND_PRESSURE1 0x74
-#define BMP180_COMMAND_PRESSURE2 0xB4
-#define BMP180_COMMAND_PRESSURE3 0xF4
+SFE_BMP180 bmp180;
 
-struct tBmp180CalibrationData {
-    int16_t AC1,AC2,AC3,VB1,VB2,MB,MC,MD;
-    uint16_t AC4,AC5,AC6; 
-    double c5,c6,mc,md,x0,x1,x2,y0,y1,y2,p0,p1,p2;
-} bmpCal;
+/// \brief   Returns temperature in celsius and pressure in Pascals
+/// \note    Tempeature reading takes 5ms, pressure reading 26ms (tested)
+/// \note    -100.0 are invalid values 
+void readBMP180(double *temp, double *pres)
+{
+  *temp = -100.0;
+  *pres = -100.0;
+  
+  char result;
+  result = bmp180.startTemperature();
+  if (result) {
+    delay(result);
+    result = bmp180.getTemperature(*temp);
+    if (result) {
+      result = bmp180.startPressure(3);
+      if (result) {
+        delay(result);
+        result = bmp180.getPressure(*pres, *temp);
+      }
+    }
+  }
+}
 
+#endif
 
 ///////////////////////////////////////////////////////////////////////
 // RTC code for DS323X chips (own)
@@ -286,16 +302,32 @@ void rtcIntSetup()
 
 void sleepNow()
 {
-  // Wait for serial writes to complete
+  // disconnect communication pins to SD card
+  // it will draw power from Arduino's digital pins otherwise
+  // and it will even allow large currents to flow into
+  // VCC line that we're going to disconnect
+  pinMode(10, INPUT);
+  pinMode(11, INPUT);
+  pinMode(12, INPUT);
+  pinMode(13, INPUT);
+  
+  // Wait for serial and SD card writes to complete
   Serial.flush();
   delay(100);
   
+  // Disconnect power from SD card (via NPN a P-MOSFET)
+  digitalWrite(SD_AWAKE_PIN, LOW);
+  digitalWrite(LED_AWAKE_PIN, LOW);
+
+  // Enter sleep mode
   set_sleep_mode(SLEEP_MODE_PWR_DOWN);
   sleep_enable();
   sleep_cpu();
+
+  // Wake up code (after interrupt from RTC)
+  sleep_disable();
+  digitalWrite(LED_AWAKE_PIN, HIGH);
 }
-
-
 
 ///////////////////////////////////////////////////////////////////////
 // SD Card code
@@ -329,55 +361,16 @@ int batVoltage(long vcc)
   return (int)((vcc*2/1023.0)*r);
 }
 
-
-class OutPin
-{
-private:
-
-  int8_t pin;
-
-public:
-
-  OutPin()
-    : pin(-1)
-  {
-  }
-  
-  void init(int8_t _pin) 
-  {
-    pin = _pin;
-    if (pin > 0)
-      pinMode(pin, OUTPUT);  
-  }
-
-  void on() 
-  {
-    if (pin>0)
-      digitalWrite(pin, HIGH);      
-  }
-
-  void off()
-  {
-    if (pin>0)
-      digitalWrite(pin, LOW);
-  }
-
-};
-
 ///////////////////////////////////////////////////////////////////////
 // Main program
 
-
-OutPin ledAwake;
-OutPin sdAwake;
-
 void setup()
 {
-  ledAwake.init(LED_AWAKE_PIN);
-  sdAwake.init(SD_AWAKE_PIN);
-  ledAwake.on();
-  sdAwake.off();
-
+  pinMode(LED_AWAKE_PIN, OUTPUT);
+  pinMode(SD_AWAKE_PIN, OUTPUT);
+  digitalWrite(LED_AWAKE_PIN, HIGH);
+  digitalWrite(SD_AWAKE_PIN, LOW);
+ 
   Serial.begin(9600);
   while (!Serial)
     ;
@@ -387,6 +380,13 @@ void setup()
   rtcDisableAlarm();
   Serial.print(F("RTC time is: "));
   Serial.println(rtcDateTimeStr());
+
+#if USE_BMP180
+  if (!bmp180.begin())
+  {
+    Serial.println(F("ERROR: BMP180 init failure\n"));
+  } 
+#endif
     
   //ReadSensors();
   //Serial.println(logLine);
@@ -398,33 +398,22 @@ void setup()
   delay(500);
   rtcAlarmInSeconds(8); // at least two minutes, alarm can happen within second here
   /// \todo fix alarm code, add safeGuardSeconds parameter
-  ledAwake.off();
   sleepNow();  
   
 }
 
 void loop()
-{
-  sleep_disable();
-  ledAwake.on();
-  /*Serial.println("Awake ...");
-  Serial.flush();
-  delay(50);*/
-  sdAwake.on();
-  /*Serial.println("SD Card powered up ...");
-  Serial.flush();
-  delay(50);*/
-  
-  rtcAlarmInSeconds(15); // preferably clear alarm now  
+{ 
+  rtcAlarmInSeconds(15); // preferably clear alarm ASAP here
 
   // Read sensors
   float htu_temp, htu_hum;
   readHTU(&htu_temp, &htu_hum);
-
-  String line;
-  char *pDateTimeStr = rtcDateTimeStr(); 
+  char *pDateTimeStr = rtcDateTimeStr();  
   long vCC  = vccVoltage();
   int vBat = batVoltage(vCC); // vcc as ref
+  
+  String line;
   line.reserve(80);
   line  = '"';
   line += pDateTimeStr;
@@ -433,11 +422,23 @@ void loop()
   line += ',';
   line += vBat;
   line += ',';
-  if (htu_temp > -90)
+  if (htu_temp > -90.0)
     line += htu_temp;
   line += ',';
-  if (htu_hum > -90)
+  if (htu_hum > -90.0)
     line += htu_hum;
+
+#if USE_BMP180
+  double bmp180_temp, bmp180_pres;
+  readBMP180(&bmp180_temp, &bmp180_pres);
+  line += ',';
+  if (bmp180_temp > -90.0)
+    line += bmp180_temp;  
+  line += ',';
+  if (bmp180_pres > -90.0)
+    line += bmp180_pres;    
+#endif
+
   line += '\n';
   Serial.print(line);
   /*Serial.flush();
@@ -481,18 +482,7 @@ void loop()
     Serial.println(F("ERROR: sd.cardBegin() failed"));
     // TODO: error LED
   }
-  // Write to card
-  delay(100);
   
-  sdAwake.off();
-  // this is nasty but since we killed power to SD card, lets disconnect communication pins as well to stop it draw power from digital pins
-  delay(5);
-  pinMode(10, INPUT);
-  pinMode(11, INPUT);
-  pinMode(12, INPUT);
-  pinMode(13, INPUT);
-  
-  ledAwake.off();
   sleepNow();
 
 }
