@@ -8,8 +8,8 @@ Just for fun.
 ## Goals:
 
 - [ ] Runs 2 months or more on "reasonable" batteries (4x3000mAH at worst)
-- [ ] Monitors temperature, humidity, pressure and battery voltage
-- [ ] Logs data to SD card
+- [x] Monitors temperature, humidity, pressure and battery voltage
+- [x] Logs data to SD card
 - [ ] Survives rain, snow and reasonably low temperatures (let's say -15C)
 
 ## Tests:
@@ -20,7 +20,7 @@ Just for fun.
 - [x] Estimate power consumption of SD card
 - [x] SD card power shut-down and re-ininitalization
 - [x] HTU21D temperature reading
-- [ ] BMP180 pressure reading
+- [x] BMP180 pressure reading
 - [x] Battery voltage monitor
 - [x] VCC monitor
 - [ ] No data corruption at low power (try to sleep forever)
