@@ -8,8 +8,8 @@ Just for fun.
 ## Goals:
 
 - [ ] Runs 2 months or more on "reasonable" batteries (4x3000mAH at worst)
-- [ ] Monitors temperature, humidity, pressure and battery voltage
-- [ ] Logs data to SD card
+- [x] Monitors temperature, humidity, pressure and battery voltage
+- [x] Logs data to SD card
 - [ ] Survives rain, snow and reasonably low temperatures (let's say -15C)
 
 ## Tests:
@@ -20,7 +20,7 @@ Just for fun.
 - [x] Estimate power consumption of SD card
 - [x] SD card power shut-down and re-ininitalization
 - [x] HTU21D temperature reading
-- [ ] BMP180 pressure reading
+- [x] BMP180 pressure reading
 - [x] Battery voltage monitor
 - [x] VCC monitor
 - [ ] No data corruption at low power (try to sleep forever)
@@ -64,13 +64,13 @@ cards can  take 15-50mA when SPI communication is ongoing and there are peaks
 caused by init/read/write/erase operations. 
 
 TLDR:
-- with power off - 0.000 :-) but there might be something going through communication pins
+- with power off - 0.000 :-) but don't forget to set pins D10-D13 to input before disconnecting power
 - SCLK low - negligible cause of cheap voltage regulator that takes 2.2mA ... approx 90uA
 - SPI communication - 15mA common, 50mA seen
 - peak - over 100mA seen, 50mA common
 
 NOTE: based on small sample of 5 SD cards. Most hungry is 32GB Kingston 
-with 90MB/s read speed. Least hungry is 16MB Canon from 2005.
+with 90MB/s read speed. Least hungry is 16MB Canon from 2005 ... i guess from IXUS55 digital camera.
 
 NOTE: measured by Arduino/INA219-based 100Hz+ 1 channel osciloscope :-)
 
