@@ -319,6 +319,10 @@ void sleepNow()
   digitalWrite(SD_AWAKE_PIN, LOW);
   digitalWrite(LED_AWAKE_PIN, LOW);
 
+  // shut down ADC (http://heliosoph.mit-links.info/arduino-powered-by-capacitor-optimized-tests/)
+  byte keep_ADCSRA = ADCSRA;
+  ADCSRA = 0;
+
   // Enter sleep mode
   set_sleep_mode(SLEEP_MODE_PWR_DOWN);
   sleep_enable();
@@ -326,6 +330,8 @@ void sleepNow()
 
   // Wake up code (after interrupt from RTC)
   sleep_disable();
+  // Restore ADC
+  ADCSRA = keep_ADCSRA;
   digitalWrite(LED_AWAKE_PIN, HIGH);
 }
 
