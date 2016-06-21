@@ -134,7 +134,7 @@ void readHTU(float *temp, float *hum)
 
 SFE_BMP180 bmp180;
 
-/// \brief   Returns temperature in celsius and pressure in Pascals
+/// \brief   Returns temperature in celsius and pressure in hPa/mBar
 /// \note    Tempeature reading takes 5ms, pressure reading 26ms (tested)
 /// \note    -100.0 are invalid values 
 void readBMP180(double *temp, double *pres)
@@ -404,7 +404,10 @@ void setup()
 
 void loop()
 { 
-  rtcAlarmInSeconds(15); // preferably clear alarm ASAP here
+  // preferably clear alarm ASAP here
+  rtcAlarmInSeconds(15);
+  // turn power to SD card on
+  digitalWrite(SD_AWAKE_PIN, HIGH);
 
   // Read sensors
   float htu_temp, htu_hum;
