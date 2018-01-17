@@ -165,7 +165,7 @@ void readBMP180(double *temp, double *pres)
 
 #define DS3231_I2C_ADDRESS 0x68
 
-/// \brief  Get datetime of DS3231 RTC, assumes UTC (same date format as GPX file)
+/// \brief  Get datetime of DS3231 RTC, assumes UTC ([ISO 8601](https://en.wikipedia.org/wiki/ISO_8601), same date format as GPX file)
 /// \return Pointer to static buffer with Time
 char * rtcDateTimeStr()
 {
